@@ -5,9 +5,17 @@ import viteLogo from '/vite.svg';
 import * as Tone from 'tone';
 import { Reverb } from 'tone';
 import { Sampler } from 'tone';
+import { initAdsr, mapMultisliderToEnvelopeValues,addOnChangeListener } from './components/adsr.js'
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const adsr = initAdsr();
+
+  addOnChangeListener(adsr, fmSynth);
+});
 
 document.querySelector('#app').innerHTML = `
-<div id="dial"></div>
+<div id="adsr"></div>
 <div id="sequence-controls-container">
     <h3>Custom Sequence:</h3>
   </div>
@@ -18,7 +26,15 @@ document.querySelector('#app').innerHTML = `
 <button id="start">Start</button>
 <div id="buttons-container">
 </div>
-  <div id="hormonicity"></div>
+  <div id="hormonicity">Harmonicity</div>
+  <span id="numberHarmon"></span>
+  <br>
+  
+  <div id="modulation">Modulation</div>
+  <br>
+  <div id="modIndex">ModIndex</div>
+
+  
   <div>
     <label for="harmon">harmon: </label>
     <input type="range" id="harmon" name="harmon" min="0" max="20" step="0.1" value="0" >
@@ -35,7 +51,25 @@ document.querySelector('#app').innerHTML = `
 
 ///////
 
-var hormonicitySlider = new Nexus.Slider("#hormonicity")
+
+
+var hormonicitySlider = new Nexus.Slider("#hormonicity",{
+  'mode': 'relative',  // 'relative' or 'absolute'
+    'min': 0,
+    'max': 4,
+    'step': 0.01,
+    'value': 0
+})
+var modulationSlider = new Nexus.Slider("#modulation", {
+   'mode': 'relative',  // 'relative' or 'absolute'
+    'min': 0,
+    'max': 20,
+    'step': 0.1,
+    'value': 0
+})
+
+var numberHarmon = new Nexus.Number('#numberHarmon')
+numberHarmon.link(hormonicitySlider)
 
 const reverb = new Reverb().toDestination();
 
@@ -58,15 +92,14 @@ const fmSynth = new Tone.PolySynth(Tone.FMSynth, {
     decay: 3,
     sustain: 1,
     release: 5,
-  },
-  modulation:2,
-  modulationIndex:2,
-  // harmonicity: 2.5
+  }
 })
   .toDestination()
   .connect(reverb);
 
   
+
+
 function updateModulationIndex(newValue) {
   fmSynth.set({ modulationIndex: newValue });
 }
@@ -75,7 +108,9 @@ function updateHarmonicity(newValue){
   fmSynth.set({ harmonicity: newValue });
 }
 
-
+function updateModulation(newValue){
+  fmSynth.set({ modulation: newValue });
+}
 
 
 let loop;
@@ -83,7 +118,7 @@ let loop;
 // Define your custom sequence using button indices
 let customSequence = [0, 0, 0, 0, 0, 0, 0, 0];
 
-const timeDivisions = ['4n', '2n', '16n', '8n'];
+const timeDivisions = ['4n', '2n', '4n', '8n'];
 
 const sequenceControlsContainer = document.querySelector(
   '#sequence-controls-container'
@@ -189,7 +224,7 @@ function playButtonsInSequence(sequence) {
     }, time + Tone.Time(randomTimeDivision).toSeconds() + randomRestDuration);
 
     currentIndex = (currentIndex + 1) % sequence.length;
-  }, '4n');
+  }, '8n');
 }
 
 Tone.Transport.bpm.value = 155;
@@ -214,24 +249,30 @@ document
   .querySelector('#transposeDown')
   .addEventListener('click', transposeDown);
 
+ 
 
+modulationSlider.on('change', function(val){
+  const modValue = parseFloat(val);
 
-  hormonicitySlider.on('change', function(val){
-    const harmonValue = parseFloat(val);
-    console.log('Modulation index changed to', harmonValue);
-    updateHarmonicity(harmonValue)
-  })
+  updateModulationIndex(modValue)
+})
 
-  document.querySelector('#harmon').addEventListener('input', (event) => {
-    const harmonValue = parseFloat(event.target.value);
-    console.log('Modulation index changed to', harmonValue);
-    
-    updateHarmonicity(harmonValue)
-  });
+hormonicitySlider.on('change', function(val){
+  const harmonValue = parseFloat(val);
+  console.log('Modulation index changed to', harmonValue);
+  updateHarmonicity(harmonValue)
+})
+
+document.querySelector('#harmon').addEventListener('input', (event) => {
+  const harmonValue = parseFloat(event.target.value);
+  console.log('Modulation index changed to', harmonValue);
+  
+  updateHarmonicity(harmonValue)
+});
 
 document.querySelector('#decay').addEventListener('input', (event) => {
-  const decayValue = parseFloat(event.target.value);
-  reverb.decay = decayValue;
+const decayValue = parseFloat(event.target.value);
+reverb.decay = decayValue;
 });
 
 document.querySelector('#wet').addEventListener('input', (event) => {
