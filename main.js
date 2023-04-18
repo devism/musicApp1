@@ -6,19 +6,57 @@ import * as Tone from 'tone';
 import { Reverb } from 'tone';
 import { Sampler } from 'tone';
 import { initAdsr, mapMultisliderToEnvelopeValues,addOnChangeListener } from './components/adsr.js'
+import {synthSeq, seqChangeListener} from './components/synthSeq.js'
 
-
+let eventId;
 document.addEventListener('DOMContentLoaded', () => {
   const adsr = initAdsr();
+  const mySynthSeq = synthSeq();
+
+  
 
   addOnChangeListener(adsr, fmSynth);
+
+  let cPhrygianFrequencies = phrygianScale(55);
+console.log("cPhrygianFrequencies:", cPhrygianFrequencies);
+  
+  const { start: startMultisliderSequencer } = createMultisliderSequencer(mySynthSeq);
+
+  document.querySelector('#start').addEventListener('click', () => {
+    Tone.start();
+    startMultisliderSequencer();
+  });
+
+  
+  function createMultisliderSequencer(mySynthSeq) {
+    let currentIndex = 0;
+    
+  
+    const start = () => {
+      eventId = Tone.Transport.scheduleRepeat((time) => {
+        const sliderValue = mySynthSeq.values[currentIndex]; // Change this line
+        const mappedValue = Math.floor((sliderValue * cPhrygianFrequencies.length) / 128);
+        const freq = cPhrygianFrequencies[mappedValue % cPhrygianFrequencies.length];
+  
+        fmSynth.triggerAttackRelease(freq, '16n', time);
+  
+        currentIndex = (currentIndex + 1) % mySynthSeq.numberOfSliders;
+      }, '8n');
+    };
+  
+    return { start };
+  }
+
+
 });
+
+
+
 
 document.querySelector('#app').innerHTML = `
 <div id="adsr"></div>
-<div id="sequence-controls-container">
-    <h3>Custom Sequence:</h3>
-  </div>
+<div id="synthSeq" style="margin-top:20px"></div> 
+
 <button id="transposeUp">Transpose Up</button>
 <button id="transposeDown">Transpose Down</button>
 <button id="init">Initialize</button>
@@ -27,8 +65,8 @@ document.querySelector('#app').innerHTML = `
 <div id="buttons-container">
 </div>
   <div id="hormonicity">Harmonicity</div>
-  <span id="numberHarmon"></span>
   <br>
+  <span id="numberHarmon"></span>
   
   <div id="modulation">Modulation</div>
   <br>
@@ -81,6 +119,7 @@ function initAudioContext() {
 const buttonsContainer = document.querySelector('#buttons-container');
 const synth = new Tone.Synth().toDestination();
 const fmSynth = new Tone.PolySynth(Tone.FMSynth, {
+  maxPolyphony: 8,
   envelope: {
     attack: 0,
     decay: 3,
@@ -124,36 +163,7 @@ const sequenceControlsContainer = document.querySelector(
   '#sequence-controls-container'
 );
 
-customSequence.forEach((value, index) => {
-  const sliderWrapper = document.createElement('div');
-  const label = document.createElement('label');
-  label.htmlFor = `custom-sequence-${index}`;
-  label.textContent = `Index ${index}: `;
 
-  const slider = document.createElement('input');
-  slider.type = 'range';
-  slider.id = `custom-sequence-${index}`;
-  slider.name = `custom-sequence-${index}`;
-  slider.min = 0;
-  slider.max = 100;
-  slider.step = 1;
-  slider.value = value;
-
-  sliderWrapper.appendChild(label);
-  sliderWrapper.appendChild(slider);
-  sequenceControlsContainer.appendChild(sliderWrapper);
-});
-
-customSequence.forEach((value, index) => {
-  document
-    .querySelector(`#custom-sequence-${index}`)
-    .addEventListener('input', (event) => {
-      const newValue = parseInt(event.target.value, 10);
-      console.log(newValue);
-      customSequence[index] = newValue;
-    });
-});
-///////////
 
 function getRandomItem(arr) {
   const randomIndex = Math.floor(Math.random() * arr.length);
@@ -174,7 +184,8 @@ const initialRootNote = 60;
 const semitonesInOctave = 12;
 let currentRootNote = initialRootNote;
 
-let cPhrygianFrequencies = phrygianScale(55);
+
+
 
 let randomTimeDivision;
 
@@ -230,9 +241,10 @@ function playButtonsInSequence(sequence) {
 Tone.Transport.bpm.value = 155;
 
 // Start playing the buttons in the custom sequence
-playButtonsInSequence(customSequence);
+// playButtonsInSequence(customSequence);
 
 function stopSeq() {
+  Tone.Transport.clear(eventId);
   Tone.Transport.stop();
 }
 
